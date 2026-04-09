@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-charcoal-900 text-white font-body;
+    margin: 0;
+    padding: 0;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-charcoal-800;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-charcoal-400 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gold-600;
+  }
+
+  ::selection {
+    @apply bg-gold-600/30 text-gold-300;
+  }
+}
+
+@layer components {
+  /* ── Gold Button ─────────────────────────────────── */
+  .btn-gold {
+    @apply bg-gold-gradient text-charcoal-900 font-semibold px-6 py-3 rounded-xl
+           transition-all duration-300 hover:shadow-gold-md hover:scale-[1.02]
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
+           disabled:hover:scale-100 disabled:hover:shadow-none;
+  }
+
+  /* ── Ghost Button ────────────────────────────────── */
+  .btn-ghost {
+    @apply border border-charcoal-400 text-white/70 font-medium px-6 py-3 rounded-xl
+           transition-all duration-300 hover:border-gold-600/60 hover:text-gold-400
+           hover:bg-gold-600/5 active:scale-[0.98];
+  }
+
+  /* ── Input Field ─────────────────────────────────── */
+  .input-dark {
+    @apply w-full bg-charcoal-700 border border-charcoal-500 rounded-xl px-4 py-3
+           text-white placeholder-white/30 font-body text-sm
+           focus:outline-none focus:border-gold-600/60 focus:bg-charcoal-600
+           transition-all duration-200;
+  }
+
+  /* ── Card Surface ────────────────────────────────── */
+  .card {
+    @apply bg-charcoal-700 border border-charcoal-500/50 rounded-2xl
+           shadow-inner-dark;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-300 hover:border-gold-700/40 hover:shadow-gold;
+  }
+
+  /* ── Gold Shimmer ─────────────────────────────────  */
+  .shimmer-gold {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(212, 160, 23, 0.15) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite linear;
+  }
+
+  /* ── Section Label ───────────────────────────────── */
+  .label {
+    @apply text-xs font-medium text-white/40 uppercase tracking-widest;
+  }
+
+  /* ── Gold Dot Indicator ──────────────────────────── */
+  .dot-gold {
+    @apply w-2 h-2 rounded-full bg-gold-400 shadow-[0_0_8px_rgba(232,184,49,0.8)];
+  }
+
+  /* ── Status Badge ────────────────────────────────── */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-500/15 text-emerald-400 border border-emerald-500/20;
+  }
+
+  .badge-pending {
+    @apply badge bg-gold-500/15 text-gold-400 border border-gold-500/20;
+  }
+
+  .badge-failed {
+    @apply badge bg-red-500/15 text-red-400 border border-red-500/20;
+  }
+}
+
+@layer utilities {
+  .text-gold-glow {
+    text-shadow: 0 0 20px rgba(212, 160, 23, 0.5);
+  }
+
+  .border-gold-glow {
+    box-shadow: 0 0 0 1px rgba(212, 160, 23, 0.3), 0 0 20px rgba(212, 160, 23, 0.1);
+  }
+
+  .bg-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  }
+
+  .animate-delay-100 { animation-delay: 100ms; }
+  .animate-delay-200 { animation-delay: 200ms; }
+  .animate-delay-300 { animation-delay: 300ms; }
+  .animate-delay-400 { animation-delay: 400ms; }
+  .animate-delay-500 { animation-delay: 500ms; }
+}
