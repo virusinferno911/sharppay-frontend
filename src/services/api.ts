@@ -4,7 +4,7 @@ const BASE_URL = 'https://sharp-pay.virusinferno.xyz/api/v1';
 
 const api = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000,
+  timeout: 120000,
   headers: { 'Content-Type': 'application/json' },
 });
 
