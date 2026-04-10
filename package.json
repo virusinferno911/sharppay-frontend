@@ -1,7 +1,7 @@
 {
-  "name": "sharppay-frontend",
+  "name": "react-vite-tailwind",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,16 +9,25 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.2",
-    "lucide-react": "^0.460.0"
+    "axios": "^1.15.0",
+    "clsx": "2.1.1",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.8.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "^7.14.0",
+    "tailwind-merge": "3.4.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
-    "tailwindcss": "^3.4.14",
-    "vite": "^5.4.10"
+    "@tailwindcss/vite": "4.1.17",
+    "@types/node": "22.19.17",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3",
+    "vite": "7.2.4",
+    "vite-plugin-singlefile": "2.3.0"
   }
 }
