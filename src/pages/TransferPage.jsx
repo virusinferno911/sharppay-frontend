@@ -2,11 +2,13 @@ import React, { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { txTransfer, txResolve, kycLiveness } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import { txTransfer, txResolve, kycLiveness, txReceipt } from '../services/api'
 import BottomNav from '../components/BottomNav'
 import Modal from '../components/Modal'
 import PinInput from '../components/PinInput'
 import LivenessCamera from '../components/LivenessCamera'
+import ReceiptModal from '../components/ReceiptModal'
 
 const BANKS = [
   { code: 'SHARP_PAY', name: 'SharpPay',   logo: '/logo.png', instant: true },
@@ -22,6 +24,7 @@ const fmt = (n) =>
 
 export default function TransferPage() {
   const nav = useNavigate()
+  const { user } = useAuth()
 
   // Form state
   const [bank, setBank]         = useState(BANKS[0])
@@ -36,6 +39,9 @@ export default function TransferPage() {
   const [pinOpen, setPinOpen]           = useState(false)
   const [livenessOpen, setLivenessOpen] = useState(false)
   const [submitting, setSubmitting]     = useState(false)
+  
+  // Receipt State
+  const [receiptData, setReceiptData]   = useState(null)
 
   // Pending PIN for liveness retry
   const pendingPinRef = useRef('')
@@ -76,14 +82,29 @@ export default function TransferPage() {
         transactionPin: pin,
         ...(bank.code !== 'SHARP_PAY' ? { bankCode: bank.code } : {}),
       }
-      await txTransfer(payload)
-      toast.success('Transfer successful! 🎉')
+      const { data } = await txTransfer(payload)
+      
+      // Get the transaction ID from the successful response
+      const txId = data?.data?.transactionId || data?.transactionId || data?.id || data?.data?.id;
+      
       setPinOpen(false)
-      setAcct(''); setAmount(''); setDesc(''); setResolvedName('')
-      nav('/dashboard')
+      toast.success('Transfer successful! 🎉')
+      
+      // Fetch and show the receipt instantly
+      if (txId) {
+        try {
+          const { data: receipt } = await txReceipt(txId);
+          setReceiptData(receipt);
+        } catch (e) {
+          // If receipt fetch fails, just go to dashboard safely
+          nav('/dashboard')
+        }
+      } else {
+        nav('/dashboard')
+      }
+
     } catch (err) {
       const msg = err.response?.data?.message || err.message || ''
-      // Backend says liveness required
       if (msg.toLowerCase().includes('liveness') || err.response?.status === 403) {
         pendingPinRef.current = pin
         setPinOpen(false)
@@ -98,7 +119,6 @@ export default function TransferPage() {
     }
   }, [acct, amount, desc, bank, nav])
 
-  // Called when liveness camera captures frame
   const handleLivenessCapture = async (file) => {
     setLivenessOpen(false)
     setSubmitting(true)
@@ -115,6 +135,15 @@ export default function TransferPage() {
   }
 
   const canProceed = acct.length >= 6 && parseFloat(amount) > 0
+
+  // Normalize receipt data for the modal to hide sender info
+  const normalizedReceipt = receiptData ? {
+    ...receiptData,
+    senderAccount: '***', // Hides the sender account number perfectly
+    senderName: receiptData.senderAccount?.user?.fullName || 'SharpPay',
+    receiverAccount: receiptData.receiverAccount?.accountNumber || '',
+    receiverName: receiptData.receiverAccount?.user?.fullName || 'SharpPay User'
+  } : null;
 
   return (
     <div className="app-shell flex flex-col min-h-screen nav-safe">
@@ -139,7 +168,6 @@ export default function TransferPage() {
 
       {/* Form */}
       <div className="flex-1 px-5 py-5 space-y-4 overflow-y-auto">
-
         {/* Bank Selector */}
         <div>
           <label className="label-dark">Recipient Bank</label>
@@ -199,7 +227,6 @@ export default function TransferPage() {
               min="1"
             />
           </div>
-          {/* Quick amounts */}
           <div className="flex gap-2 mt-2">
             {[1000, 5000, 10000, 50000].map(v => (
               <button key={v} onClick={() => setAmount(String(v))}
@@ -252,7 +279,6 @@ export default function TransferPage() {
         </div>
       </div>
 
-      {/* ── Bank picker modal ── */}
       <Modal open={bankOpen} onClose={() => setBankOpen(false)} title="Select Bank">
         <div className="space-y-1 -mx-1">
           {BANKS.map(b => (
@@ -274,7 +300,6 @@ export default function TransferPage() {
         </div>
       </Modal>
 
-      {/* ── PIN modal ── */}
       <Modal open={pinOpen} onClose={() => { if (!submitting) setPinOpen(false) }} title="Transaction PIN">
         <div className="py-3">
           <div className="flex items-center gap-3 mb-5 px-1">
@@ -303,7 +328,6 @@ export default function TransferPage() {
         </div>
       </Modal>
 
-      {/* ── Liveness modal ── */}
       <Modal open={livenessOpen} onClose={() => !submitting && setLivenessOpen(false)} title="Liveness Check Required" noPad>
         <div className="p-4">
           <p className="text-white/40 text-sm text-center mb-4">
@@ -317,6 +341,16 @@ export default function TransferPage() {
       </Modal>
 
       <BottomNav />
+
+      {/* ── STUNNING RECEIPT MODAL ── */}
+      {receiptData && (
+        <ReceiptModal 
+          isOpen={!!receiptData} 
+          onClose={() => { setReceiptData(null); nav('/dashboard'); }} 
+          transaction={normalizedReceipt} 
+          myAccountNumber={user?.accountNumber} 
+        />
+      )}
     </div>
   )
 }

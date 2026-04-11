@@ -5,27 +5,16 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../contexts/AuthContext'
 import { txList, txReceipt } from '../services/api'
 import BottomNav from '../components/BottomNav'
+import ReceiptModal from '../components/ReceiptModal'
 
 const fmt = (n) =>
   '₦' + Number(n || 0).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-
-const txIcon = (type) => {
-  const t = (type || '').toLowerCase()
-  if (t.includes('credit') || t.includes('fund') || t.includes('receive')) return { icon: '↙', bg: 'bg-green-500/15', color: 'text-green-400' }
-  if (t.includes('bill') || t.includes('utility')) return { icon: '⚡', bg: 'bg-yellow-500/15', color: 'text-yellow-400' }
-  return { icon: '↗', bg: 'bg-rose-500/15', color: 'text-rose-400' }
-}
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleString('en-NG', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true
   })
 }
 
@@ -79,25 +68,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleShareReceipt = async () => {
-    if (!receiptData) return;
-    const shareText = `SharpPay Transaction Receipt\n\nAmount: ${fmt(receiptData.amount)}\nStatus: ${receiptData.status}\nRef: ${receiptData.transactionId}\nDate: ${formatDateTime(receiptData.createdAt)}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'SharpPay Receipt',
-          text: shareText,
-        });
-      } catch (err) {
-        console.log('User canceled sharing');
-      }
-    } else {
-      navigator.clipboard.writeText(shareText);
-      toast.success('Receipt copied to clipboard!');
-    }
-  }
-
   const QUICK = [
     { label: 'Send Money', icon: SendIcon, color: 'from-rose-600 to-pink-700', to: '/transfer' },
     { label: 'Pay Bills',  icon: BillIcon,  color: 'from-violet-600 to-purple-700', to: '/bills' },
@@ -105,6 +75,15 @@ export default function DashboardPage() {
   ]
 
   const kycBanner = user?.kycStatus && user.kycStatus !== 'VERIFIED' && user.kycStatus !== 'verified'
+
+  // Prepare normalized receipt data for the modal to ensure object structures don't break
+  const normalizedReceipt = receiptData ? {
+    ...receiptData,
+    senderAccount: receiptData.transactionType === 'WELCOME_BONUS' ? 'SharpPay' : '***', // Hides sender account per your request
+    senderName: receiptData.senderAccount?.user?.fullName || receiptData.senderName || 'SharpPay',
+    receiverAccount: receiptData.receiverAccount?.accountNumber || receiptData.receiverAccount || '',
+    receiverName: receiptData.receiverAccount?.user?.fullName || receiptData.receiverName || 'SharpPay User'
+  } : null;
 
   return (
     <div className="app-shell flex flex-col min-h-screen nav-safe relative">
@@ -247,8 +226,16 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-2 pb-4">
             {txs.map((tx, i) => {
-              const { icon, bg, color } = txIcon(tx.type || tx.transactionType)
-              const isCredit = icon === '↙'
+              // ACCURATE CREDIT/DEBIT LOGIC
+              const isCredit = 
+                tx.receiverAccount?.accountNumber === user?.accountNumber || 
+                tx.receiverAccount === user?.accountNumber || 
+                tx.transactionType === 'WELCOME_BONUS';
+
+              const icon = isCredit ? '↙' : '↗';
+              const bg = isCredit ? 'bg-green-500/15' : 'bg-rose-500/15';
+              const color = isCredit ? 'text-green-400' : 'text-rose-400';
+
               return (
                 <motion.div key={tx.id || tx._id || i}
                   onClick={() => handleTxClick(tx.transactionId || tx.id)}
@@ -285,102 +272,15 @@ export default function DashboardPage() {
 
       <BottomNav />
 
-      {/* ── RECEIPT MODAL (z-[9999]) ── */}
-      <AnimatePresence>
-        {selectedTxId && (
-          <motion.div 
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div 
-              initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
-              className="w-full max-w-sm bg-[#0f0f0f] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-              
-              {/* Receipt Header */}
-              <div className="p-6 text-center border-b border-white/5" style={{ background: 'linear-gradient(180deg, rgba(225,29,72,0.1) 0%, rgba(15,15,15,1) 100%)' }}>
-                <div className="w-12 h-12 mx-auto rounded-2xl overflow-hidden mb-4 border border-white/10 shadow-lg">
-                  <img src="/logo.png" alt="SP" className="w-full h-full object-cover" />
-                </div>
-                <h3 className="text-white font-bold text-lg">Transaction Receipt</h3>
-                <p className="text-white/40 text-xs mt-1">{formatDateTime(receiptData?.createdAt || new Date())}</p>
-              </div>
-
-              {/* Receipt Content */}
-              <div className="p-6 overflow-y-auto">
-                {receiptLoading ? (
-                  <div className="flex justify-center py-10">
-                    <div className="w-8 h-8 border-2 border-white/20 border-t-rose-500 rounded-full animate-spin" />
-                  </div>
-                ) : receiptData ? (
-                  <div className="space-y-6">
-                    <div className="text-center">
-                      <p className="text-white/50 text-xs uppercase tracking-widest mb-1">Amount</p>
-                      <p className="text-white font-mono font-black text-4xl">{fmt(receiptData.amount)}</p>
-                      <div className="inline-block mt-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20 text-green-400 text-xs font-bold uppercase">
-                        {receiptData.status}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 pt-4 border-t border-dashed border-white/10">
-                      <div className="flex justify-between items-start">
-                        <span className="text-white/50 text-sm">Type</span>
-                        <span className="text-white font-bold text-sm text-right">{receiptData.transactionType}</span>
-                      </div>
-                      
-                      {receiptData.senderAccount && (
-                        <div className="flex justify-between items-start">
-                          <span className="text-white/50 text-sm">From</span>
-                          <span className="text-white font-bold text-sm text-right">
-                            {receiptData.senderAccount.user?.fullName || receiptData.senderAccount.accountNumber}
-                          </span>
-                        </div>
-                      )}
-                      
-                      {receiptData.receiverAccount && (
-                        <div className="flex justify-between items-start">
-                          <span className="text-white/50 text-sm">To</span>
-                          <span className="text-white font-bold text-sm text-right">
-                            {receiptData.receiverAccount.user?.fullName || receiptData.receiverAccount.accountNumber}
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="flex justify-between items-start">
-                        <span className="text-white/50 text-sm">Description</span>
-                        <span className="text-white font-bold text-sm text-right max-w-[150px] truncate">
-                          {receiptData.description || 'N/A'}
-                        </span>
-                      </div>
-
-                      <div className="flex justify-between items-start">
-                        <span className="text-white/50 text-sm">Reference</span>
-                        <span className="text-white/80 font-mono text-xs text-right bg-white/5 px-2 py-1 rounded">
-                          {receiptData.transactionId}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-white/50 text-center text-sm py-10">Failed to load receipt data.</p>
-                )}
-              </div>
-
-              {/* Receipt Footer Buttons */}
-              <div className="p-4 border-t border-white/5 bg-black/20 flex gap-3">
-                <button onClick={() => setSelectedTxId(null)} 
-                  className="flex-1 py-3.5 rounded-xl font-bold text-white/70 bg-white/5 hover:bg-white/10 transition-colors">
-                  Close
-                </button>
-                <button onClick={handleShareReceipt} disabled={receiptLoading || !receiptData}
-                  className="flex-1 py-3.5 rounded-xl font-bold text-white disabled:opacity-50"
-                  style={{ background: 'linear-gradient(135deg,#e11d48,#7c3aed)' }}>
-                  Share Receipt
-                </button>
-              </div>
-
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── STUNNING RECEIPT MODAL ── */}
+      {!receiptLoading && receiptData && (
+        <ReceiptModal 
+          isOpen={!!selectedTxId} 
+          onClose={() => { setSelectedTxId(null); setReceiptData(null); }} 
+          transaction={normalizedReceipt} 
+          myAccountNumber={user?.accountNumber} 
+        />
+      )}
     </div>
   )
 }
