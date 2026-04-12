@@ -27,7 +27,6 @@ export default function KycPage() {
   const frontRef = useRef()
   const backRef  = useRef()
   
-  // Guard to prevent ghost double-clicks
   const isSubmittingGuard = useRef(false)
 
   const pickFile = (setter, next) => (e) => {
@@ -64,27 +63,18 @@ export default function KycPage() {
       setTimeout(() => nav('/dashboard'), 2500)
       
     } catch (err) {
-      // ==========================================
-      // SMART FALLBACK: THE GHOST ERROR CATCHER
-      // ==========================================
-      // If the connection drops but Java successfully processed the AWS match, 
-      // we double-check the user's status directly from the database before showing an error.
       try {
         const { data } = await authMe();
         const userStatus = data?.data?.kycStatus || data?.kycStatus;
-        
-        if (userStatus === 'VERIFIED') {
+        if (userStatus === 'VERIFIED' || userStatus === 'verified') {
           await refreshUser();
           setDone(true);
           toast.success('Identity Verified Successfully! ₦50,000 Credited.');
           setTimeout(() => nav('/dashboard'), 2500);
-          return; // Exit immediately so the error toast never shows!
+          return;
         }
-      } catch (fallbackErr) {
-        // Silently ignore fallback errors
-      }
+      } catch (fallbackErr) {}
 
-      // If we reach here, it actually failed (e.g. AWS rejected the fake ID)
       const errorMsg = err.response?.data?.message || err.message || '';
       if (errorMsg.includes('already KYC Verified') || errorMsg.includes('already exist')) {
         await refreshUser();
@@ -100,134 +90,75 @@ export default function KycPage() {
     }
   }
 
-  // If liveness camera is running, render full-screen cam
   if (livenessStarted) {
     return (
-      <div className="app-shell flex flex-col min-h-screen">
-        <div className="relative px-5 pt-14 pb-5 flex items-center gap-3"
-          style={{ background: '#0A0A0A', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <button onClick={() => setLivenessStarted(false)}
-            className="w-10 h-10 rounded-2xl glass flex items-center justify-center">
-            <svg className="w-5 h-5 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+      <div className="app-shell flex flex-col min-h-screen bg-gradient-to-b from-[#fff1f2] to-[#fdf4ff]">
+        <div className="relative px-5 pt-14 pb-5 flex items-center gap-3 bg-white border-b border-purple-50 shadow-sm">
+          <button onClick={() => setLivenessStarted(false)} className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <div>
-            <h1 className="text-lg font-black text-white">Liveness Check</h1>
-            <p className="text-white/40 text-xs">Follow the on-screen instructions</p>
-          </div>
+          <div><h1 className="text-lg font-black text-purple-950">Liveness Check</h1><p className="text-purple-900/50 text-xs font-bold">Follow the on-screen instructions</p></div>
         </div>
-        <div className="flex-1 px-4 py-4 overflow-y-auto">
-          <LivenessCamera
-            onCapture={handleLivenessCapture}
-            onCancel={() => setLivenessStarted(false)}
-          />
-        </div>
+        <div className="flex-1 px-4 py-4 overflow-y-auto"><LivenessCamera onCapture={handleLivenessCapture} onCancel={() => setLivenessStarted(false)} /></div>
       </div>
     )
   }
 
   if (done) {
     return (
-      <div className="app-shell flex items-center justify-center min-h-screen">
-        <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', damping: 16 }}
-          className="flex flex-col items-center gap-5 px-8 text-center">
-          <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl"
-            style={{ background: 'linear-gradient(135deg,#059669,#0d9488)' }}>✅</div>
-          <h2 className="text-white font-black text-2xl">KYC Submitted!</h2>
-          <p className="text-white/40 text-sm leading-relaxed">
-            Your identity has been verified securely. Redirecting to your dashboard...
-          </p>
+      <div className="app-shell flex items-center justify-center min-h-screen bg-gradient-to-b from-[#fff1f2] to-[#fdf4ff]">
+        <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 16 }} className="flex flex-col items-center gap-5 px-8 text-center">
+          <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl shadow-xl shadow-emerald-600/20" style={{ background: 'linear-gradient(135deg,#059669,#10b981)' }}>✅</div>
+          <h2 className="text-purple-950 font-black text-2xl">KYC Submitted!</h2>
+          <p className="text-purple-900/60 text-sm font-semibold leading-relaxed">Your identity has been verified securely. Redirecting to your dashboard...</p>
         </motion.div>
       </div>
     )
   }
 
   return (
-    <div className="app-shell flex flex-col min-h-screen">
-      {/* Header */}
-      <div className="relative px-5 pt-14 pb-6 overflow-hidden"
-        style={{ background: 'linear-gradient(160deg,#050018 0%,#0a0018 50%,#0A0A0A 100%)' }}>
-        <div className="absolute inset-0 opacity-20"
-          style={{ backgroundImage: 'radial-gradient(ellipse at 50% 50%, #7c3aed 0%, transparent 60%)' }} />
-        <div className="absolute bottom-0 left-0 right-0 h-10"
-          style={{ background: 'linear-gradient(to bottom,transparent,#0A0A0A)' }} />
-        <div className="relative flex items-center gap-3">
-          <button onClick={() => nav(-1)}
-            className="w-10 h-10 rounded-2xl glass flex items-center justify-center mr-1">
-            <svg className="w-5 h-5 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
+    <div className="app-shell flex flex-col min-h-screen nav-safe bg-gradient-to-b from-[#fff1f2] to-[#fdf4ff]">
+      <div className="relative px-5 pt-14 pb-8 rounded-b-[40px] shadow-lg overflow-hidden" style={{ background: 'linear-gradient(135deg, #be123c 0%, #db2777 50%, #7c3aed 100%)' }}>
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, #fde047 0%, transparent 50%)' }} />
+        <div className="relative flex items-center gap-3 z-10">
+          <button onClick={() => nav(-1)} className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mr-1 shadow-sm hover:bg-white/30 transition-colors border border-white/20">
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <div>
-            <h1 className="text-xl font-black text-white">Identity Verification</h1>
-            <p className="text-white/40 text-xs">Secure · Encrypted · ~2 minutes</p>
-          </div>
+          <div><h1 className="text-xl font-black text-white tracking-wide">Identity Verification</h1><p className="text-amber-200 text-xs font-semibold uppercase tracking-widest mt-0.5">Secure · Encrypted</p></div>
         </div>
       </div>
 
-      {/* Step indicator */}
-      <div className="px-5 pt-5 pb-3">
+      <div className="px-5 pt-6 pb-3">
         <div className="relative flex items-center justify-between">
-          <div className="absolute left-5 right-5 top-5 h-px bg-white/10 z-0" />
-          <div
-            className="absolute left-5 top-5 h-px z-0 transition-all duration-500"
-            style={{
-              background: 'linear-gradient(90deg,#e11d48,#7c3aed)',
-              width: `${((step - 1) / 2) * (100 - 10)}%`,
-            }}
-          />
+          <div className="absolute left-5 right-5 top-5 h-px bg-purple-100 z-0" />
+          <div className="absolute left-5 top-5 h-1 z-0 transition-all duration-500 rounded-full" style={{ background: 'linear-gradient(90deg,#e11d48,#7c3aed)', width: `${((step - 1) / 2) * (100 - 10)}%` }} />
           {STEPS.map((s) => (
             <div key={s.n} className="flex flex-col items-center gap-1.5 z-10">
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-base transition-all duration-300 font-bold
-                ${step > s.n
-                  ? 'text-white shadow-brand'
-                  : step === s.n
-                  ? 'text-white shadow-brand'
-                  : 'glass text-white/30'
-                }`}
-                style={step >= s.n ? { background: 'linear-gradient(135deg,#e11d48,#7c3aed)' } : {}}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-base transition-all duration-300 font-bold border-2 ${step >= s.n ? 'text-white border-transparent shadow-md' : 'bg-white text-purple-300 border-purple-100'}`} style={step >= s.n ? { background: 'linear-gradient(135deg,#e11d48,#7c3aed)' } : {}}>
                 {step > s.n ? '✓' : s.icon}
               </div>
-              <span className={`text-[10px] font-bold transition-colors ${step >= s.n ? 'text-rose-400' : 'text-white/25'}`}>
-                {s.label}
-              </span>
+              <span className={`text-[10px] font-black uppercase tracking-wider transition-colors ${step >= s.n ? 'text-purple-950' : 'text-purple-300'}`}>{s.label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Step content */}
       <div className="flex-1 px-5 py-4 overflow-y-auto">
         <AnimatePresence mode="wait">
-          <motion.div key={step}
-            initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }}>
-
-            <div className="mb-5">
-              <h2 className="text-white font-black text-xl">{STEPS[step - 1].label}</h2>
-              <p className="text-white/40 text-sm mt-1">{STEPS[step - 1].desc}</p>
+          <motion.div key={step} initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }}>
+            <div className="mb-6 bg-white rounded-3xl p-5 shadow-sm border border-purple-50">
+              <h2 className="text-purple-950 font-black text-xl mb-1">{STEPS[step - 1].label}</h2>
+              <p className="text-purple-900/60 text-xs font-bold">{STEPS[step - 1].desc}</p>
             </div>
 
             {step === 1 && (
-              <UploadZone
-                file={idFront}
-                onPick={() => frontRef.current.click()}
-                label="ID Front"
-                hint="Passport · NIN Slip · Driver's License (Front)"
-              >
+              <UploadZone file={idFront} onPick={() => frontRef.current.click()} label="ID Front" hint="Passport · NIN Slip · Driver's License">
                 <input ref={frontRef} type="file" accept="image/*" onChange={pickFile(setIdFront)} className="hidden" />
               </UploadZone>
             )}
 
             {step === 2 && (
-              <UploadZone
-                file={idBack}
-                onPick={() => backRef.current.click()}
-                label="ID Back"
-                hint="The reverse side of the same document"
-              >
+              <UploadZone file={idBack} onPick={() => backRef.current.click()} label="ID Back" hint="The reverse side of the same document">
                 <input ref={backRef} type="file" accept="image/*" onChange={pickFile(setIdBack)} className="hidden" />
               </UploadZone>
             )}
@@ -235,48 +166,28 @@ export default function KycPage() {
             {step === 3 && (
               <div>
                 {selfie ? (
-                  <div className="rounded-2xl p-5 flex items-center gap-4 mb-4"
-                    style={{ background: 'rgba(5,150,105,0.12)', border: '1px solid rgba(5,150,105,0.3)' }}>
-                    <div className="w-12 h-12 rounded-2xl bg-green-500/20 flex items-center justify-center text-2xl flex-shrink-0">✅</div>
-                    <div>
-                      <p className="text-green-400 font-bold text-sm">Liveness check passed!</p>
-                      <p className="text-green-400/50 text-xs mt-0.5">Your face has been captured securely</p>
-                    </div>
-                    <button onClick={() => setSelfie(null)}
-                      className="ml-auto text-white/30 hover:text-white/60 text-xs">Redo</button>
+                  <div className="rounded-3xl p-5 flex items-center gap-4 mb-4 bg-emerald-50 border border-emerald-100 shadow-sm">
+                    <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-2xl flex-shrink-0">✅</div>
+                    <div><p className="text-emerald-700 font-black text-sm">Liveness check passed!</p><p className="text-emerald-600/70 text-xs font-bold mt-0.5">Your face has been captured securely</p></div>
+                    <button onClick={() => setSelfie(null)} className="ml-auto text-emerald-600 hover:text-emerald-800 text-xs font-black uppercase tracking-wider">Redo</button>
                   </div>
                 ) : (
-                  <div className="rounded-2xl p-8 text-center mb-4"
-                    style={{ background: 'rgba(124,58,237,0.08)', border: '2px dashed rgba(124,58,237,0.3)' }}>
-                    <div className="text-5xl mb-3">🤳</div>
-                    <p className="text-white font-bold mb-1">Face Liveness Check</p>
-                    <p className="text-white/35 text-sm mb-5 leading-relaxed">
-                      We'll guide you through a quick scan to confirm you're a real person, not a photo.
-                    </p>
-                    <button onClick={() => setLivenessStarted(true)}
-                      className="px-6 py-3 rounded-2xl font-bold text-white text-sm shadow-brand"
-                      style={{ background: 'linear-gradient(135deg,#7c3aed,#e11d48)' }}>
-                      Start Liveness Check
-                    </button>
+                  <div className="rounded-3xl p-8 text-center mb-4 bg-purple-50 border-2 border-dashed border-purple-200">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto text-3xl mb-4 shadow-sm border border-purple-100">🤳</div>
+                    <p className="text-purple-950 font-black text-lg mb-1">Face Liveness Check</p>
+                    <p className="text-purple-900/60 text-xs font-bold mb-6 leading-relaxed">We'll guide you through a quick scan to confirm you're a real person.</p>
+                    <button onClick={() => setLivenessStarted(true)} className="px-6 py-3.5 rounded-full font-black text-white text-sm shadow-lg shadow-rose-600/20 active:scale-95 transition-transform" style={{ background: 'linear-gradient(135deg,#e11d48,#7c3aed)' }}>Start Liveness Check</button>
                   </div>
                 )}
 
-                {/* Review summary */}
                 {idFront && idBack && (
-                  <div className="glass rounded-2xl p-4 mb-4 space-y-3">
-                    <p className="text-white/50 text-xs font-bold uppercase tracking-widest">Review Documents</p>
-                    {[
-                      { label: 'ID Front', file: idFront },
-                      { label: 'ID Back',  file: idBack  },
-                    ].map(({ label, file }) => (
-                      <div key={label} className="flex items-center gap-3">
-                        <img src={URL.createObjectURL(file)} alt={label}
-                          className="w-14 h-10 rounded-xl object-cover border border-white/10" />
-                        <div>
-                          <p className="text-white text-sm font-semibold">{label}</p>
-                          <p className="text-white/30 text-xs">{(file.size / 1024).toFixed(0)} KB</p>
-                        </div>
-                        <span className="ml-auto text-green-400 text-sm">✓</span>
+                  <div className="bg-white rounded-3xl p-5 mb-4 space-y-4 shadow-sm border border-purple-50">
+                    <p className="text-purple-900/50 text-[10px] font-black uppercase tracking-widest">Review Documents</p>
+                    {[{ label: 'ID Front', file: idFront }, { label: 'ID Back', file: idBack }].map(({ label, file }) => (
+                      <div key={label} className="flex items-center gap-4">
+                        <img src={URL.createObjectURL(file)} alt={label} className="w-14 h-10 rounded-lg object-cover border border-purple-100 shadow-sm" />
+                        <div><p className="text-purple-950 text-sm font-black">{label}</p><p className="text-purple-900/50 text-[10px] font-bold mt-0.5">{(file.size / 1024).toFixed(0)} KB</p></div>
+                        <span className="ml-auto text-emerald-500 text-sm font-black">✓</span>
                       </div>
                     ))}
                   </div>
@@ -284,31 +195,17 @@ export default function KycPage() {
               </div>
             )}
 
-            {/* Navigation */}
-            <div className="mt-5 space-y-3 pb-6">
+            <div className="mt-6 space-y-3 pb-6">
               {step < 3 ? (
-                <button
-                  onClick={() => setStep(s => s + 1)}
-                  disabled={(step === 1 && !idFront) || (step === 2 && !idBack)}
-                  className="brand-btn-primary disabled:opacity-40">
+                <button onClick={() => setStep(s => s + 1)} disabled={(step === 1 && !idFront) || (step === 2 && !idBack)} className="w-full py-4 rounded-full font-black text-white text-sm uppercase tracking-wider transition-all disabled:opacity-40 active:scale-95 shadow-lg shadow-rose-600/20" style={{ background: 'linear-gradient(135deg, #e11d48 0%, #7c3aed 100%)' }}>
                   Continue
                 </button>
               ) : (
-                <button
-                  onClick={submit}
-                  disabled={!idFront || !idBack || !selfie || submitting}
-                  className="brand-btn-primary disabled:opacity-40 flex items-center justify-center gap-2">
-                  {submitting
-                    ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting…</>
-                    : 'Submit KYC'}
+                <button onClick={submit} disabled={!idFront || !idBack || !selfie || submitting} className="w-full py-4 rounded-full font-black text-white text-sm uppercase tracking-wider transition-all disabled:opacity-40 active:scale-95 shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #e11d48 0%, #7c3aed 100%)' }}>
+                  {submitting ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Submitting…</> : 'Submit KYC'}
                 </button>
               )}
-              {step > 1 && (
-                <button onClick={() => setStep(s => s - 1)}
-                  className="brand-btn-ghost">
-                  Back
-                </button>
-              )}
+              {step > 1 && <button onClick={() => setStep(s => s - 1)} className="w-full py-4 rounded-full font-black text-rose-600 bg-rose-50 hover:bg-rose-100 text-sm uppercase tracking-wider transition-colors active:scale-95">Back</button>}
             </div>
           </motion.div>
         </AnimatePresence>
@@ -320,32 +217,21 @@ export default function KycPage() {
 function UploadZone({ file, onPick, label, hint, children }) {
   return (
     <div>
-      <button onClick={onPick}
-        className={`w-full rounded-2xl p-6 text-center transition-all duration-200 cursor-pointer
-          ${file
-            ? 'border-2 border-rose-500/50 bg-rose-500/8'
-            : 'border-2 border-dashed border-white/15 bg-white/3 hover:border-white/25 hover:bg-white/5'
-          }`}>
+      <button onClick={onPick} className={`w-full rounded-3xl p-6 text-center transition-all duration-200 cursor-pointer border-2 ${file ? 'border-rose-300 bg-rose-50 shadow-sm' : 'border-dashed border-purple-200 bg-white hover:border-purple-300 hover:bg-purple-50'}`}>
         {file ? (
           <div className="flex items-center gap-4 text-left">
-            <img src={URL.createObjectURL(file)} alt="preview"
-              className="w-20 h-14 rounded-xl object-cover border border-white/15 flex-shrink-0" />
+            <img src={URL.createObjectURL(file)} alt="preview" className="w-20 h-14 rounded-xl object-cover border border-rose-200 flex-shrink-0 shadow-sm" />
             <div>
-              <p className="text-white font-semibold text-sm">{file.name}</p>
-              <p className="text-rose-400 text-xs mt-0.5">✓ Uploaded · Tap to change</p>
-              <p className="text-white/30 text-xs">{(file.size / 1024).toFixed(0)} KB</p>
+              <p className="text-purple-950 font-black text-sm truncate max-w-[150px]">{file.name}</p>
+              <p className="text-rose-600 text-[10px] font-bold mt-1 uppercase tracking-wider">✓ Uploaded · Tap to change</p>
             </div>
           </div>
         ) : (
           <div className="py-6">
-            <div className="w-16 h-16 glass rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">📎</div>
-            <p className="text-white font-bold mb-1.5">{label}</p>
-            <p className="text-white/35 text-xs mb-4 leading-relaxed">{hint}</p>
-            <span className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#e11d48,#7c3aed)' }}>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
+            <div className="w-16 h-16 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl border border-purple-100 shadow-sm">📎</div>
+            <p className="text-purple-950 font-black mb-1">{label}</p>
+            <p className="text-purple-900/50 text-xs font-bold mb-5">{hint}</p>
+            <span className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-xs font-black text-white uppercase tracking-wider shadow-sm" style={{ background: 'linear-gradient(135deg,#e11d48,#7c3aed)' }}>
               Choose File
             </span>
           </div>

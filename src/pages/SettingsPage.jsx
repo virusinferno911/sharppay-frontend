@@ -1,254 +1,114 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { authSettings } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import BottomNav from '../components/BottomNav'
 import Modal from '../components/Modal'
 import PinInput from '../components/PinInput'
-
-const KYC_BADGE = {
-  VERIFIED:    { label: 'Verified',   color: 'text-green-400',  bg: 'bg-green-500/15', dot: 'bg-green-400' },
-  PENDING:     { label: 'Pending',    color: 'text-amber-400',  bg: 'bg-amber-500/15', dot: 'bg-amber-400' },
-  UNVERIFIED:  { label: 'Not Verified', color: 'text-rose-400', bg: 'bg-rose-500/15',  dot: 'bg-rose-400'  },
-  REJECTED:    { label: 'Rejected',   color: 'text-red-400',    bg: 'bg-red-500/15',   dot: 'bg-red-400'   },
-}
+import api from '../services/api' 
 
 export default function SettingsPage() {
   const nav = useNavigate()
   const { user, logout, refreshUser } = useAuth()
+  
+  const [livenessLimit, setLivenessLimit] = useState(user?.livenessTransferLimit || 50000)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+  const [pinReset, setPinReset] = useState(0)
+  const [loadingPin, setLoadingPin] = useState(false)
 
-  const [pinOpen, setPinOpen]       = useState(false)
-  const [pinStep, setPinStep]       = useState(1)   // 1=enter, 2=confirm
-  const [firstPin, setFirstPin]     = useState('')
-  const [pinReset, setPinReset]     = useState(0)
-  const [savingPin, setSavingPin]   = useState(false)
-
-  const [logoutOpen, setLogoutOpen] = useState(false)
-
-  const kycStatus = (user?.kycStatus || 'UNVERIFIED').toUpperCase()
-  const badge     = KYC_BADGE[kycStatus] || KYC_BADGE.UNVERIFIED
-
-  const openPinModal = () => { setPinStep(1); setFirstPin(''); setPinReset(r => r+1); setPinOpen(true) }
-
-  const handlePinStep = (pin) => {
-    if (pinStep === 1) { setFirstPin(pin); setPinStep(2); setPinReset(r => r+1) }
-    else {
-      if (pin !== firstPin) {
-        toast.error('PINs do not match. Please try again.')
-        setPinStep(1); setFirstPin(''); setPinReset(r => r+1)
-        return
-      }
-      savePin(pin)
-    }
-  }
-
-  const savePin = async (pin) => {
-    setSavingPin(true)
+  const handleLogout = () => { logout(); toast.success('Logged out successfully'); nav('/login') }
+  
+  const handleSaveLimit = async () => {
     try {
-      await authSettings({ transactionPin: pin })
-      toast.success('Transaction PIN updated! 🔒')
-      setPinOpen(false)
+      await api.post('/auth/settings', { livenessTransferLimit: Number(livenessLimit) })
+      toast.success(`Liveness Limit set to ₦${Number(livenessLimit).toLocaleString()}`)
+      await refreshUser()
+    } catch(err) { toast.error('Failed to save limit') }
+  }
+
+  const handleChangePin = async (newPin) => {
+    setLoadingPin(true)
+    try {
+      await api.post('/auth/settings', { transactionPin: String(newPin) })
+      toast.success('Transaction PIN updated securely!')
+      setPinModalOpen(false)
+      setLoadingPin(false)
     } catch (err) {
-      toast.error(err.response?.data?.message || err.message)
-      setPinStep(1); setFirstPin(''); setPinReset(r => r+1)
-    } finally {
-      setSavingPin(false)
+      toast.error(err.response?.data?.message || 'Failed to change PIN')
+      setPinReset(r => r + 1)
+      setLoadingPin(false)
     }
   }
 
-  const handleLogout = () => { logout(); nav('/', { replace: true }); toast.success('Signed out') }
-
-  const initials = (name) => {
-    if (!name) return 'SP'
-    return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
-  }
-
-  const MENU = [
-    {
-      title: 'Account',
-      items: [
-        {
-          icon: '🛡️', label: 'Identity Verification', sub: badge.label,
-          badgeBg: badge.bg, badgeColor: badge.color, badgeDot: badge.dot,
-          action: () => nav('/kyc'),
-          highlight: kycStatus !== 'VERIFIED',
-        },
-        {
-          icon: '🔑', label: 'Transaction PIN', sub: 'Set or update your 4-digit PIN',
-          action: openPinModal,
-        },
-      ],
-    },
-    {
-      title: 'Support',
-      items: [
-        { icon: '💬', label: 'Help & Support',   sub: 'Chat, email, or call us', action: () => toast('Opening support…') },
-        { icon: '📋', label: 'Privacy Policy',   sub: 'Read our policy', action: () => toast('Opening policy…') },
-        { icon: '📃', label: 'Terms of Service', sub: 'Read our terms',  action: () => toast('Opening terms…') },
-      ],
-    },
-  ]
+  const isVerified = user?.kycStatus === 'VERIFIED' || user?.kycStatus === 'verified'
 
   return (
-    <div className="app-shell flex flex-col min-h-screen nav-safe">
-      {/* Header / Profile */}
-      <div className="relative overflow-hidden px-5 pt-14 pb-8"
-        style={{ background: 'linear-gradient(160deg,#0a0018 0%,#0f0018 50%,#0A0A0A 100%)' }}>
-        <div className="absolute inset-0 opacity-20"
-          style={{ backgroundImage: 'radial-gradient(ellipse at 50% 0%, #7c3aed 0%, transparent 60%)' }} />
-        <div className="absolute bottom-0 left-0 right-0 h-10"
-          style={{ background: 'linear-gradient(to bottom, transparent, #0A0A0A)' }} />
-        <div className="relative flex flex-col items-center text-center gap-3 pb-2">
-          {/* Avatar */}
-          <motion.div
-            initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-            className="w-20 h-20 rounded-3xl flex items-center justify-center text-2xl font-black text-white shadow-brand-lg"
-            style={{ background: 'linear-gradient(135deg,#be123c 0%,#4c1d95 100%)' }}>
-            {initials(user?.fullName || user?.name)}
-          </motion.div>
-          <div>
-            <p className="text-white font-black text-xl">{user?.fullName || user?.name || 'User'}</p>
-            <p className="text-white/40 text-sm mt-0.5">{user?.email || ''}</p>
-          </div>
-          {/* KYC badge */}
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full ${badge.bg}`}>
-            <div className={`w-1.5 h-1.5 rounded-full ${badge.badgeDot || badge.dot}`} />
-            <span className={`text-xs font-bold ${badge.color}`}>KYC {badge.label}</span>
-          </div>
+    <div className="app-shell flex flex-col min-h-screen nav-safe bg-gradient-to-b from-[#fff1f2] to-[#fdf4ff]">
+      <div className="relative px-5 pt-14 pb-8 rounded-b-[40px] shadow-lg overflow-hidden" style={{ background: 'linear-gradient(135deg, #be123c 0%, #db2777 50%, #7c3aed 100%)' }}>
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, #fde047 0%, transparent 50%)' }} />
+        <div className="relative flex items-center justify-between z-10">
+          <div><h1 className="text-2xl font-black text-white tracking-wide">My Profile</h1><p className="text-amber-200 text-xs font-semibold uppercase tracking-widest mt-0.5">Settings & Security</p></div>
         </div>
       </div>
 
-      {/* Account number card */}
-      {user?.accountNumber && (
-        <div className="mx-5 mt-4">
-          <div className="glass rounded-2xl px-4 py-3 flex items-center justify-between">
-            <div>
-              <p className="text-white/40 text-xs mb-0.5">SharpPay Account</p>
-              <p className="text-white font-bold font-mono tracking-widest">{user.accountNumber}</p>
+      <div className="flex-1 px-5 py-6 overflow-y-auto pb-24 space-y-6">
+        <div className="bg-white rounded-[32px] p-6 shadow-sm border border-purple-50 relative overflow-hidden">
+          <div className="flex flex-col items-center text-center">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-100 to-purple-100 border-4 border-white shadow-md flex items-center justify-center text-3xl font-black text-purple-700 mb-3 relative z-10">{user?.fullName ? user.fullName[0] : 'U'}</div>
+            <h2 className="text-purple-950 font-black text-xl mb-1">{user?.fullName || 'SharpPay User'}</h2>
+            <div className={`flex items-center justify-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${isVerified ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-purple-50 text-purple-600 border-purple-100'}`}>
+               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+               {isVerified ? 'Tier 3 Merchant' : 'Tier 1 User'}
             </div>
-            <button
-              onClick={() => { navigator.clipboard?.writeText(user.accountNumber); toast.success('Copied!') }}
-              className="w-9 h-9 glass rounded-xl flex items-center justify-center">
-              <svg className="w-4 h-4 text-white/50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-              </svg>
-            </button>
+          </div>
+          <div className="mt-6 space-y-4 pt-6 border-t border-purple-50">
+            <div className="flex justify-between items-center"><span className="text-purple-900/50 text-xs font-bold uppercase tracking-wider">Account Number</span><span className="text-purple-950 font-mono font-black text-sm">{user?.accountNumber || 'N/A'} <span className="ml-2 cursor-pointer text-rose-500" onClick={() => {navigator.clipboard.writeText(user?.accountNumber); toast.success('Copied!')}}>📋</span></span></div>
+            <div className="flex justify-between items-center"><span className="text-purple-900/50 text-xs font-bold uppercase tracking-wider">Email Address</span><span className="text-purple-950 font-bold text-sm truncate max-w-[180px]">{user?.email || 'N/A'}</span></div>
+            <div className="flex justify-between items-center"><span className="text-purple-900/50 text-xs font-bold uppercase tracking-wider">Phone Number</span><span className="text-purple-950 font-bold text-sm">{user?.phoneNumber || 'N/A'}</span></div>
           </div>
         </div>
-      )}
 
-      {/* Menu sections */}
-      <div className="flex-1 px-5 mt-5 space-y-5">
-        {MENU.map((section) => (
-          <div key={section.title}>
-            <p className="label-dark mb-2">{section.title}</p>
-            <div className="glass rounded-2xl divide-y divide-white/8 overflow-hidden">
-              {section.items.map((item, i) => (
-                <motion.button
-                  key={item.label}
-                  onClick={item.action}
-                  whileTap={{ scale: 0.98 }}
-                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  className={`w-full flex items-center gap-3 px-4 py-4 hover:bg-white/5 transition-colors text-left
-                    ${item.highlight ? 'bg-amber-500/5' : ''}`}>
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0
-                    ${item.highlight ? 'bg-amber-500/15' : 'glass'}`}>
-                    {item.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-semibold text-sm ${item.highlight ? 'text-amber-300' : 'text-white'}`}>
-                      {item.label}
-                    </p>
-                    {item.badgeDot
-                      ? <div className="flex items-center gap-1.5 mt-0.5">
-                          <div className={`w-1.5 h-1.5 rounded-full ${item.badgeDot}`} />
-                          <span className={`text-xs font-semibold ${item.badgeColor}`}>{item.sub}</span>
-                        </div>
-                      : <p className="text-white/35 text-xs mt-0.5 truncate">{item.sub}</p>
-                    }
-                  </div>
-                  <svg className="w-4 h-4 text-white/20 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                  </svg>
-                </motion.button>
-              ))}
+        <div className="bg-white rounded-[32px] p-6 shadow-sm border border-purple-50">
+          <h3 className="text-purple-950 font-black text-sm mb-4">Account Verification</h3>
+          <button onClick={() => nav('/kyc')} className="w-full flex items-center justify-between p-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 transition-colors border border-emerald-100 group">
+            <div className="flex items-center gap-3">
+               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-emerald-600 shadow-sm">🛡️</div>
+               <div className="text-left">
+                 <span className="text-purple-950 font-bold text-sm block">Identity Verification</span>
+                 <span className="text-purple-900/50 text-[10px] block mt-0.5">{isVerified ? 'Fully Verified' : 'Action Required to increase limits'}</span>
+               </div>
             </div>
-          </div>
-        ))}
-
-        {/* Logout */}
-        <div className="pb-4">
-          <button onClick={() => setLogoutOpen(true)}
-            className="w-full flex items-center justify-center gap-2 py-4 rounded-2xl border border-red-500/25 bg-red-500/8
-              text-red-400 font-bold text-sm hover:bg-red-500/15 transition-all active:scale-97">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-            </svg>
-            Sign Out
+            <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </button>
         </div>
 
-        <p className="text-center text-white/15 text-xs pb-6">SharpPay v1.0.0 · Secured by 256-bit SSL</p>
+        <div className="bg-white rounded-[32px] p-6 shadow-sm border border-purple-50">
+          <h3 className="text-purple-950 font-black text-sm mb-4">Security & Limits</h3>
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-2"><span className="text-purple-950 font-bold text-sm">Liveness Transfer Limit</span><span className="text-rose-600 font-mono font-black text-sm">₦{Number(livenessLimit).toLocaleString()}</span></div>
+            <p className="text-purple-900/50 text-[10px] leading-relaxed mb-4">Any transfer above this amount will automatically trigger a Facial Liveness verification check.</p>
+            <input type="range" min="10000" max="500000" step="10000" value={livenessLimit} onChange={(e) => setLivenessLimit(e.target.value)} onMouseUp={handleSaveLimit} onTouchEnd={handleSaveLimit} className="w-full accent-rose-600 h-2 bg-purple-100 rounded-lg appearance-none cursor-pointer" />
+            <div className="flex justify-between text-purple-900/40 text-[9px] font-bold mt-1.5"><span>₦10,000</span><span>₦500,000</span></div>
+          </div>
+
+          <button onClick={() => setPinModalOpen(true)} className="w-full flex items-center justify-between p-4 rounded-2xl bg-purple-50 hover:bg-purple-100 transition-colors border border-purple-100 group">
+            <div className="flex items-center gap-3">
+               <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-purple-600 shadow-sm"><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg></div>
+               <span className="text-purple-950 font-bold text-sm">Change Transaction PIN</span>
+            </div>
+            <svg className="w-4 h-4 text-purple-300 group-hover:text-purple-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+        <button onClick={handleLogout} className="w-full py-4 rounded-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-black text-sm uppercase tracking-wider transition-colors active:scale-95 border border-rose-100 shadow-sm">Log Out</button>
       </div>
 
-      {/* ── Transaction PIN modal ── */}
-      <Modal open={pinOpen} onClose={() => !savingPin && setPinOpen(false)} title="Set Transaction PIN">
-        <div className="py-3">
-          <AnimatePresence mode="wait">
-            <motion.div key={pinStep}
-              initial={{ opacity: 0, x: pinStep === 1 ? 20 : -20 }}
-              animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}>
-              <div className="flex items-center gap-3 mb-5 px-1">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                  style={{ background: 'linear-gradient(135deg,#4c1d95,#be123c)' }}>
-                  {pinStep === 1 ? '🔑' : '✅'}
-                </div>
-                <div>
-                  <p className="text-white font-bold text-sm">
-                    {pinStep === 1 ? 'Enter a new PIN' : 'Confirm your PIN'}
-                  </p>
-                  <p className="text-white/35 text-xs">
-                    {pinStep === 1 ? 'Choose a secure 4-digit transaction PIN' : 'Re-enter the same PIN to confirm'}
-                  </p>
-                </div>
-              </div>
-              <PinInput
-                label={pinStep === 1 ? 'New 4-digit PIN' : 'Confirm PIN'}
-                onComplete={handlePinStep}
-                onReset={pinReset}
-              />
-              {savingPin && (
-                <div className="flex items-center justify-center gap-2 mt-4 text-white/40 text-sm">
-                  <div className="w-4 h-4 border border-white/30 border-t-white rounded-full animate-spin" />
-                  Saving your PIN…
-                </div>
-              )}
-            </motion.div>
-          </AnimatePresence>
+      <Modal open={pinModalOpen} onClose={() => { if (!loadingPin) setPinModalOpen(false) }} title="Change PIN">
+        <div className="py-4 px-2 relative z-[99999]">
+          <p className="text-purple-950 text-sm font-bold text-center mb-6">Enter your new 4-digit secure PIN.</p>
+          <PinInput label="" onComplete={handleChangePin} onReset={pinReset} />
+          {loadingPin && <div className="flex items-center justify-center gap-2 mt-6 text-purple-600 text-sm font-bold"><div className="w-5 h-5 border-2 border-purple-200 border-t-purple-600 rounded-full animate-spin" /> Saving...</div>}
         </div>
       </Modal>
-
-      {/* ── Logout confirm modal ── */}
-      <Modal open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Sign Out">
-        <p className="text-white/50 text-sm mb-5 leading-relaxed">
-          Are you sure you want to sign out of your SharpPay account?
-        </p>
-        <div className="space-y-3">
-          <button onClick={handleLogout}
-            className="w-full py-3.5 rounded-2xl bg-red-500/15 border border-red-500/30 text-red-400 font-bold text-sm
-              hover:bg-red-500/25 transition-all active:scale-97">
-            Yes, Sign Out
-          </button>
-          <button onClick={() => setLogoutOpen(false)}
-            className="w-full py-3.5 rounded-2xl glass text-white/60 font-semibold text-sm hover:text-white transition-colors">
-            Cancel
-          </button>
-        </div>
-      </Modal>
-
       <BottomNav />
     </div>
   )
