@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import BottomNav from '../components/BottomNav'
 import Modal from '../components/Modal'
@@ -21,11 +20,9 @@ export default function BillsPage() {
   const nav = useNavigate()
   const { user, refreshUser } = useAuth()
   const [searchParams] = useSearchParams()
-  
-  const urlTab = searchParams.get('tab')
-  const defaultCat = CATEGORIES.find(c => c.label.toLowerCase() === (urlTab || 'airtime').toLowerCase()) || CATEGORIES[0]
+  const defaultTab = searchParams.get('tab') || 'Airtime'
 
-  const [activeCat, setActiveCat] = useState(defaultCat)
+  const [activeCat, setActiveCat] = useState(CATEGORIES.find(c => c.label.toLowerCase() === defaultTab.toLowerCase()) || CATEGORIES[0])
   const [provider, setProvider] = useState(activeCat.providers[0])
   const [billerId, setBillerId] = useState('')
   const [amount, setAmount] = useState('')
@@ -44,7 +41,7 @@ export default function BillsPage() {
   const handlePay = async (pin) => {
     setSubmitting(true)
     try {
-      // THE EXACT PAYLOAD FOR YOUR BACKEND DTO
+      // STRICT MATCH to BillPaymentRequest.java
       const payload = {
         amount: parseFloat(amount),
         billType: activeCat.id,
@@ -53,11 +50,10 @@ export default function BillsPage() {
       };
 
       const { data } = await api.post('/transactions/bills', payload)
-      
       const txId = data?.transactionId || data?.data?.transactionId;
+      
       setPinOpen(false)
       toast.success(`${activeCat.label} purchased successfully!`)
-      
       await refreshUser()
       
       if (txId) {
@@ -70,7 +66,10 @@ export default function BillsPage() {
       setBillerId('')
       setAmount('')
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Payment failed. Check your balance and PIN.')
+      // READS THE EXACT ERROR FROM JAVA
+      const resData = err.response?.data;
+      const errMsg = resData?.message || (typeof resData === 'string' ? resData : 'Payment failed');
+      toast.error(errMsg);
       setPinReset(r => r + 1)
     } finally {
       setSubmitting(false)
@@ -107,8 +106,7 @@ export default function BillsPage() {
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl whitespace-nowrap transition-all shadow-sm ${
                   isActive ? 'bg-rose-600 text-white shadow-rose-600/30 font-bold' : 'bg-white text-purple-900 border border-purple-50 font-semibold hover:bg-purple-50'
                 }`}>
-                <span>{cat.icon}</span>
-                <span className="text-sm">{cat.label}</span>
+                <span>{cat.icon}</span><span className="text-sm">{cat.label}</span>
               </button>
             )
           })}

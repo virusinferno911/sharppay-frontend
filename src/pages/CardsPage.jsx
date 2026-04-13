@@ -45,7 +45,13 @@ export default function CardsPage() {
   const handleCreateCard = async () => {
     setCreating(true)
     try {
-      const { data } = await api.post('/cards/create', { cardType: 'VIRTUAL', cardPin: '1234' })
+      // STRICT MATCH to CardCreateRequest.java
+      const payload = {
+        cardType: 'VIRTUAL',
+        cardPin: '1234'
+      };
+
+      const { data } = await api.post('/cards/create', payload)
       const responseData = data?.data || data;
       const c = Array.isArray(responseData) ? responseData[0] : responseData;
       const pan = c?.cardNumber || c?.card_number || c?.pan;
@@ -54,14 +60,17 @@ export default function CardsPage() {
         id: c.id,
         pan: String(pan),
         last4: String(pan).slice(-4),
-        cvv: c.cvv || c.card_pin || '•••',
+        cvv: c.cvv || c.card_pin || c.cardPin || '•••',
         expiry: c.expiryDate || c.expiry || '12/28',
         status: c.status || 'ACTIVE'
       })
       toast.success('Virtual Card created securely! 🎉')
-      await refreshUser() // Refresh balance after the ₦1,000 fee deduction
+      await refreshUser() 
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create card')
+      // READS THE EXACT ERROR FROM JAVA
+      const resData = err.response?.data;
+      const errMsg = resData?.message || (typeof resData === 'string' ? resData : 'Failed to create card. Check balance.');
+      toast.error(errMsg);
     } finally {
       setCreating(false)
     }

@@ -41,10 +41,8 @@ export default function TransferPage() {
   const [submitting, setSubmitting] = useState(false)
   const [receiptData, setReceiptData] = useState(null)
   
-  const pendingPinRef = useRef('')
   const [pinReset, setPinReset] = useState(0)
 
-  // Fetch REAL recents dynamically from API
   useEffect(() => {
     txList().then(({ data }) => {
       const list = data?.data || data?.transactions || data || [];
@@ -78,17 +76,50 @@ export default function TransferPage() {
     setBank(BANKS.find(b => b.code === recent.bankCode) || BANKS[0]); setAcct(recent.account); resolveAccount(recent.account);
   }
 
-  const doTransfer = useCallback(async (pin, selfieFile = null) => {
+  // ==========================================
+  // LOGIC FIX: Check Liveness BEFORE opening the PIN modal
+  // ==========================================
+  const handleProceedClick = () => {
+    const transferAmount = parseFloat(amount);
+    const limit = user?.livenessTransferLimit ? Number(user.livenessTransferLimit) : 50000;
+    
+    if (transferAmount >= limit) {
+        setLivenessOpen(true);
+    } else {
+        setPinOpen(true);
+    }
+  }
+
+  const handleLivenessCapture = async (file) => {
+    setLivenessOpen(false); 
+    setSubmitting(true);
+    try {
+      const fd = new FormData(); 
+      fd.append('liveSelfie', file);
+      await kycLiveness(fd);
+      
+      toast.success('Liveness verified! Please enter your PIN.');
+      setPinOpen(true); 
+    } catch (err) { 
+      const resData = err.response?.data;
+      toast.error(resData?.message || (typeof resData === 'string' ? resData : 'Liveness check failed'));
+    } finally { 
+      setSubmitting(false); 
+    }
+  }
+
+  const doTransfer = useCallback(async (pin) => {
     setSubmitting(true)
     try {
-      // YOUR EXACT ORIGINAL PAYLOAD LOGIC
+      // THE FIX: Sends exactly what Java expects, plus bankCode if it's external
       const payload = {
-        receiverAccountNumber: acct,
+        receiverAccountNumber: String(acct),
         amount: parseFloat(amount),
-        description: desc,
-        transactionPin: pin,
-        ...(bank.code !== 'SHARP_PAY' ? { bankCode: bank.code } : {}),
+        description: desc || "Internal Transfer",
+        transactionPin: String(pin),
+        ...(bank.code !== 'SHARP_PAY' ? { bankCode: bank.code } : {})
       }
+      
       const { data } = await txTransfer(payload)
       const txId = data?.data?.transactionId || data?.transactionId || data?.id || data?.data?.id;
       
@@ -100,33 +131,16 @@ export default function TransferPage() {
         try {
           const { data: receipt } = await txReceipt(txId);
           setReceiptData(receipt);
-          // Notice there is NO nav('/dashboard') here. The popup will stay open!
-        } catch (e) {
-          nav('/dashboard')
-        }
-      } else {
-        nav('/dashboard')
+        } catch (e) {}
       }
-
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || ''
-      if (msg.toLowerCase().includes('liveness') || err.response?.status === 403) {
-        pendingPinRef.current = pin; setPinOpen(false); setTimeout(() => setLivenessOpen(true), 300);
-      } else {
-        toast.error(msg || 'Transfer failed'); setPinReset(r => r + 1);
-      }
-    } finally { setSubmitting(false) }
-  }, [acct, amount, desc, bank, nav, refreshUser])
-
-  const handleLivenessCapture = async (file) => {
-    setLivenessOpen(false); setSubmitting(true)
-    try {
-      const fd = new FormData(); fd.append('liveSelfie', file)
-      await kycLiveness(fd)
-      toast.success('Liveness verified! Retrying…')
-      await doTransfer(pendingPinRef.current, file)
-    } catch (err) { toast.error(err.response?.data?.message || 'Liveness failed') } finally { setSubmitting(false) }
-  }
+      // Reads exact Java error
+      const resData = err.response?.data;
+      const errMsg = resData?.message || (typeof resData === 'string' ? resData : 'Transfer failed. Check your PIN.');
+      toast.error(errMsg); 
+      setPinReset(r => r + 1);
+    } finally { setSubmitting(false); }
+  }, [acct, amount, desc, bank, refreshUser])
 
   const canProceed = acct.length >= 6 && parseFloat(amount) > 0
 
@@ -142,6 +156,7 @@ export default function TransferPage() {
         </div>
       </div>
 
+      {/* RESTORED: Horizontal Recent Contacts */}
       <div className="px-5 -mt-6 relative z-20">
         <div className="bg-white/80 backdrop-blur-xl border border-rose-100 shadow-xl shadow-rose-900/5 rounded-3xl p-4 flex gap-4 overflow-x-auto no-scrollbar">
           <div className="flex flex-col items-center justify-center min-w-[60px] cursor-pointer group">
@@ -158,6 +173,7 @@ export default function TransferPage() {
       </div>
 
       <div className="flex-1 px-5 py-6 space-y-5 overflow-y-auto pb-24">
+        {/* RESTORED: Bank Selector */}
         <div className="bg-white rounded-3xl p-2 shadow-sm border border-purple-50">
           <label className="block text-purple-900/50 text-[11px] font-bold uppercase tracking-wider px-3 pt-2">Recipient Bank</label>
           <button onClick={() => setBankOpen(true)} className="w-full flex items-center justify-between px-3 py-3 rounded-2xl bg-transparent transition-all hover:bg-rose-50/50">
@@ -169,6 +185,7 @@ export default function TransferPage() {
           </button>
         </div>
 
+        {/* RESTORED: Account Number & Name Resolution Checkmark */}
         <div className="bg-white rounded-3xl p-4 shadow-sm border border-purple-50 focus-within:border-rose-300 focus-within:ring-2 focus-within:ring-rose-100 transition-all">
           <label className="block text-purple-900/50 text-[11px] font-bold uppercase tracking-wider mb-1">Account Number</label>
           <input type="text" inputMode="numeric" value={acct} onChange={handleAcctChange} placeholder="0000000000" className="w-full bg-transparent border-none p-0 text-purple-950 font-black text-lg tracking-widest focus:ring-0 placeholder:text-purple-200" maxLength={10} />
@@ -189,25 +206,20 @@ export default function TransferPage() {
             <span className="text-purple-900/40 font-black text-2xl">₦</span>
             <input type="number" inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" className="w-full bg-transparent border-none p-0 text-purple-950 font-black text-3xl focus:ring-0 placeholder:text-purple-200 font-mono" min="1" />
           </div>
-          <div className="flex gap-2 mt-3">
-            {[1000, 5000, 10000, 50000].map(v => (
-              <button key={v} onClick={() => setAmount(String(v))} className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${Number(amount) === v ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20' : 'bg-purple-50 text-purple-600 hover:bg-purple-100'}`}>
-                {v >= 1000 ? `₦${v/1000}K` : `₦${v}`}
-              </button>
-            ))}
-          </div>
         </div>
 
+        {/* RESTORED: Description Field */}
         <div className="bg-white rounded-3xl p-4 shadow-sm border border-purple-50 focus-within:border-rose-300 focus-within:ring-2 focus-within:ring-rose-100 transition-all">
           <label className="block text-purple-900/50 text-[11px] font-bold uppercase tracking-wider mb-1">Description <span className="normal-case opacity-60">(Optional)</span></label>
           <input type="text" value={desc} onChange={e => setDesc(e.target.value)} placeholder="What's this for?" className="w-full bg-transparent border-none p-0 text-purple-950 font-bold text-sm focus:ring-0 placeholder:text-purple-200" maxLength={100} />
         </div>
 
-        <button onClick={() => setPinOpen(true)} disabled={!canProceed || submitting} className="w-full py-4 mt-2 rounded-full font-black text-white text-sm uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95 shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #e11d48 0%, #7c3aed 100%)' }}>
+        <button onClick={handleProceedClick} disabled={!canProceed || submitting} className="w-full py-4 mt-2 rounded-full font-black text-white text-sm uppercase tracking-wider transition-all disabled:opacity-50 active:scale-95 shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #e11d48 0%, #7c3aed 100%)' }}>
           {submitting ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</> : 'Proceed to Pay'}
         </button>
       </div>
 
+      {/* RESTORED: Bank Selection Modal */}
       <Modal open={bankOpen} onClose={() => setBankOpen(false)} title="Select Bank">
         <div className="space-y-2 p-2 max-h-[60vh] overflow-y-auto no-scrollbar">
           {BANKS.map(b => (
@@ -222,6 +234,7 @@ export default function TransferPage() {
 
       <Modal open={pinOpen} onClose={() => { if (!submitting) setPinOpen(false) }} title="Confirm Payment">
         <div className="py-4 px-2">
+          {/* RESTORED: Payment summary inside the PIN modal */}
           <div className="bg-purple-50 border border-purple-100 rounded-3xl p-5 mb-6 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full flex items-center justify-center shadow-md bg-white border border-rose-100"><span className="text-2xl">💸</span></div>
             <div><p className="text-purple-900/50 text-[10px] font-bold uppercase tracking-wider mb-0.5">You are sending</p><p className="text-purple-950 font-black text-xl font-mono">{fmt(parseFloat(amount) || 0)}</p><p className="text-rose-600 text-xs font-bold mt-1 max-w-[200px] truncate">To: {resolvedName || acct}</p></div>
@@ -232,12 +245,11 @@ export default function TransferPage() {
 
       <Modal open={livenessOpen} onClose={() => !submitting && setLivenessOpen(false)} title="Face ID Required" noPad>
         <div className="p-4 bg-white">
-          <p className="text-purple-900/60 text-sm text-center mb-4 font-semibold">For your security, please complete a quick face scan to proceed.</p>
+          <p className="text-purple-900/60 text-sm text-center mb-4 font-semibold">Transfer exceeds limit. Complete face scan to proceed.</p>
           <LivenessCamera onCapture={handleLivenessCapture} onCancel={() => setLivenessOpen(false)} />
         </div>
       </Modal>
 
-      {/* Navigates to dashboard only AFTER the user closes the modal */}
       <ReceiptModal isOpen={!!receiptData} onClose={() => { setReceiptData(null); nav('/dashboard'); }} transaction={receiptData} myAccountNumber={user?.accountNumber} />
     </div>
   )
