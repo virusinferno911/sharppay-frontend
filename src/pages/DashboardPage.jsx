@@ -160,7 +160,12 @@ export default function DashboardPage() {
       <div className="px-5 flex-1 bg-white rounded-t-[40px] pt-8 pb-24 shadow-[0_-10px_40px_rgba(159,18,57,0.05)] border-t border-rose-50">
         <div className="flex items-center justify-between mb-6 px-1">
           <h3 className="text-purple-950 font-black text-lg">Recent Transactions</h3>
-          {txs.length > 0 && <span className="text-rose-600 text-xs font-bold">{txs.length} total</span>}
+          {/* UPDATED: History button taking users to full list */}
+          {txs.length > 0 && (
+            <button onClick={() => nav('/history')} className="text-rose-600 text-xs font-bold hover:underline active:scale-95 transition-all">
+              History →
+            </button>
+          )}
         </div>
 
         {txLoading ? (
@@ -169,7 +174,8 @@ export default function DashboardPage() {
           <div className="text-center py-10 opacity-50"><span className="text-4xl">💸</span><p className="text-purple-900 mt-4 font-bold">No Transactions</p></div>
         ) : (
           <div className="space-y-4">
-            {txs.map((tx, i) => {
+            {/* UPDATED: Uses .slice(0, 3) to strictly limit to 3 items */}
+            {txs.slice(0, 3).map((tx, i) => {
               const { isCredit, opponentName } = getTxDetails(tx, user?.accountNumber);
               const icon = isCredit ? '↙' : '↗';
               const iconBg = isCredit ? 'bg-emerald-50' : 'bg-rose-50';

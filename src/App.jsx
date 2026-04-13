@@ -14,6 +14,7 @@ import CardsPage     from './pages/CardsPage'
 import BillsPage     from './pages/BillsPage'
 import SettingsPage  from './pages/SettingsPage'
 import KycPage       from './pages/KycPage'
+import HistoryPage   from './pages/HistoryPage' // <-- Imported here
 
 export default function App() {
   return (
@@ -48,6 +49,10 @@ export default function App() {
           <Route path="/bills"       element={<ProtectedRoute><BillsPage /></ProtectedRoute>} />
           <Route path="/settings"    element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
           <Route path="/kyc"         element={<ProtectedRoute><KycPage /></ProtectedRoute>} />
+          
+          {/* Added the new History route here securely */}
+          <Route path="/history"     element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
+          
           <Route path="*"            element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
