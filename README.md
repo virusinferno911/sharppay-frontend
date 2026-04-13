@@ -1,4 +1,4 @@
-# SharpPay Frontend 
+# SharpPay Frontend 🚀
 
 A premium, high-performance Neo-Banking frontend for **SharpPay**, built to deliver a seamless, secure, and visually stunning user experience. 
 
@@ -44,3 +44,23 @@ The app uses a modern, vibrant gradient theme to convey trust and premium qualit
 ### 1. Install dependencies
 ```bash
 npm install
+2. Environment Setup
+Create a .env file in the root directory and point it to your Spring Boot backend:
+
+Code snippet
+VITE_API_URL=[https://your-live-backend-domain.com/api/v1](https://your-live-backend-domain.com/api/v1)
+(For local development, use http://localhost:8080/api/v1)
+
+3. Start development server
+Bash
+npm run dev
+4. Build for production
+Bash
+npm run build
+npm run preview
+🔐 Security & API Handling
+JWT Authentication: Tokens are securely stored and automatically injected into headers via an Axios Interceptor (src/services/api.js).
+
+Liveness Checks: Transactions exceeding the user's custom limit trigger an immediate LivenessCamera pop-up for facial verification.
+
+Transaction PINs: All financial movements (Transfers, Bills) require a 4-digit PIN, managed via a custom <PinInput /> component.
