@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BASE_URL = 'https://sharp-pay.virusinferno.xyz/api/v1'
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://sharppay-backend.onrender.com/api/v1'
 
 const api = axios.create({
   baseURL: BASE_URL,
